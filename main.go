@@ -5,9 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
 
 	"pm-worldcup/clob"
 	"pm-worldcup/display"
@@ -17,7 +17,7 @@ import (
 
 func main() {
 	slug := flag.String("slug", "", "Market slug from Polymarket URL (required)")
-	obOnly := flag.Bool("ob", false, "Show order book charts only")
+	showOB := flag.Bool("ob", false, "Show order book charts (toggle with o key)")
 	flag.Parse()
 
 	if *slug == "" {
@@ -45,7 +45,6 @@ func main() {
 	}
 
 	state := market.NewState(marketInfo.Outcomes)
-	term := display.NewTerminal(*marketInfo, *obOnly)
 
 	wsClient := clob.NewWSClient(func(eventType string, data json.RawMessage) {
 		handleEvent(eventType, data, state)
@@ -64,22 +63,13 @@ func main() {
 	fmt.Println("Connected! Waiting for data...")
 	time.Sleep(time.Second)
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
+	m := display.NewModel(*marketInfo, state, *showOB)
+	p := tea.NewProgram(m, tea.WithAltScreen())
 
-	for {
-		select {
-		case <-sigChan:
-			fmt.Println("\nShutting down...")
-			wsClient.Close()
-			return
-		case <-ticker.C:
-			snaps, trades := state.Snapshot(marketInfo.Outcomes)
-			term.Render(snaps, trades)
-		}
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 	}
+	wsClient.Close()
 }
 
 func handleEvent(eventType string, data json.RawMessage, state *market.State) {

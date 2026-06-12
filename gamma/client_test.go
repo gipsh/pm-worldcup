@@ -52,6 +52,43 @@ func TestParseMarket_MissingOutcomes_FallsBackToDefaults(t *testing.T) {
 	}
 }
 
+func TestParseEvent_NegRisk(t *testing.T) {
+	e := eventResponse{
+		Slug:    "fifwc-usa-par-2026-06-12",
+		Title:   "United States vs. Paraguay",
+		Closed:  false,
+		EndDate: "2026-06-13T01:00:00Z",
+		Volume:  9068860.89,
+		Markets: []eventSubMarket{
+			{Slug: "fifwc-usa-par-2026-06-12-draw", ClobTokenIDs: `["tokDraw","tokDrawNo"]`},
+			{Slug: "fifwc-usa-par-2026-06-12-usa", ClobTokenIDs: `["tokUSA","tokUSANo"]`},
+			{Slug: "fifwc-usa-par-2026-06-12-par", ClobTokenIDs: `["tokPAR","tokPARNo"]`},
+		},
+	}
+	got, err := parseEvent(e)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got.Outcomes) != 3 {
+		t.Fatalf("want 3 outcomes, got %d", len(got.Outcomes))
+	}
+	if got.Outcomes[0].Name != "DRAW" || got.Outcomes[0].TokenID != "tokDraw" {
+		t.Errorf("outcome 0: got %+v", got.Outcomes[0])
+	}
+	if got.Outcomes[1].Name != "USA" || got.Outcomes[1].TokenID != "tokUSA" {
+		t.Errorf("outcome 1: got %+v", got.Outcomes[1])
+	}
+	if got.Outcomes[2].Name != "PAR" || got.Outcomes[2].TokenID != "tokPAR" {
+		t.Errorf("outcome 2: got %+v", got.Outcomes[2])
+	}
+	if got.Slug != "fifwc-usa-par-2026-06-12" {
+		t.Errorf("want slug fifwc-usa-par-2026-06-12, got %q", got.Slug)
+	}
+	if got.Question != "United States vs. Paraguay" {
+		t.Errorf("want title 'United States vs. Paraguay', got %q", got.Question)
+	}
+}
+
 func TestParseMarket_MarketMetadata(t *testing.T) {
 	m := marketResponse{
 		Question:     "Who wins the match?",

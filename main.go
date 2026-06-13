@@ -13,6 +13,7 @@ import (
 	"pm-worldcup/display"
 	"pm-worldcup/gamma"
 	"pm-worldcup/market"
+	"pm-worldcup/trade"
 )
 
 func main() {
@@ -37,6 +38,24 @@ func main() {
 	for i, o := range marketInfo.Outcomes {
 		fmt.Printf("  Outcome %d: %s\n", i+1, o.Name)
 	}
+
+	// Load trading credentials from env (optional)
+	var tradeClient *trade.Client
+	privateKey := os.Getenv("POLY_PRIVATE_KEY")
+	proxyAddress := os.Getenv("POLY_PROXY_ADDRESS")
+	if privateKey != "" {
+		fmt.Println("Authenticating with Polymarket CLOB...")
+		tc, err := trade.NewClient(privateKey, proxyAddress)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: trading disabled — %v\n", err)
+		} else {
+			tradeClient = tc
+			fmt.Println("Trading enabled.")
+		}
+	} else {
+		fmt.Println("No POLY_PRIVATE_KEY set — trading tabs disabled.")
+	}
+
 	fmt.Println("Connecting to WebSocket...")
 
 	tokenIDs := make([]string, len(marketInfo.Outcomes))
@@ -63,7 +82,7 @@ func main() {
 	fmt.Println("Connected! Waiting for data...")
 	time.Sleep(time.Second)
 
-	m := display.NewModel(*marketInfo, state, *showOB)
+	m := display.NewModel(*marketInfo, state, *showOB, tradeClient)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {
@@ -88,7 +107,6 @@ func handleEvent(eventType string, data json.RawMessage, state *market.State) {
 			asks[i] = market.PriceLevel{Price: a.Price, Size: a.Size}
 		}
 		state.UpdateBook(msg.AssetID, bids, asks)
-
 	case "price_change":
 		msg, err := clob.ParsePriceChangeMessage(data)
 		if err != nil {
@@ -97,12 +115,11 @@ func handleEvent(eventType string, data json.RawMessage, state *market.State) {
 		for _, pc := range msg.PriceChanges {
 			state.UpdateBestPrices(pc.AssetID, pc.BestBid, pc.BestAsk)
 		}
-
 	case "last_trade_price":
-		trade, err := clob.ParseTradeMessage(data)
+		tr, err := clob.ParseTradeMessage(data)
 		if err != nil {
 			return
 		}
-		state.AddTrade(*trade)
+		state.AddTrade(*tr)
 	}
 }

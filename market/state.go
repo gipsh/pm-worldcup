@@ -47,6 +47,22 @@ func (s *State) AddTrade(t Trade) {
 	}
 }
 
+// SnapshotOne returns a snapshot for a single outcome.
+func (s *State) SnapshotOne(outcome Outcome) OutcomeSnapshot {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	book := s.books[outcome.TokenID]
+	if book == nil {
+		book = &Orderbook{AssetID: outcome.TokenID}
+	}
+	bookCopy := *book
+	return OutcomeSnapshot{
+		Outcome:   outcome,
+		Book:      bookCopy,
+		LastPrice: s.prices[outcome.TokenID],
+	}
+}
+
 func (s *State) Snapshot(outcomes []Outcome) ([]OutcomeSnapshot, []Trade) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

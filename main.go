@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/joho/godotenv"
 
 	"pm-worldcup/clob"
 	"pm-worldcup/display"
@@ -17,6 +18,8 @@ import (
 )
 
 func main() {
+	_ = godotenv.Load() // load .env if present; ignore error if file doesn't exist
+
 	slug := flag.String("slug", "", "Market slug from Polymarket URL (required)")
 	showOB := flag.Bool("ob", false, "Show order book charts (toggle with o key)")
 	flag.Parse()
